@@ -50,16 +50,16 @@ namespace JobQueueApi.Controllers
             try
             {
                 var job = await _proccessor.GetById(id);
-                var result = new JobResult()
-                {
-                    Job = job,
-                    CurrentPlaceInQueue = -1
-                };
                 if (job == null)
                 {
                     _logger.LogInformation($"found no jobs in DB that match the given id: {id}.");
                     return NotFound();
                 }
+                var result = new JobResult()
+                {
+                    Job = job,
+                    CurrentPlaceInQueue = -1
+                };
                 if (Enum.Parse<JobStatus>(job.Status) == JobStatus.Queued)
                 {
                     result.CurrentPlaceInQueue = _queue.GetCurrentItemQueuePosition(job.Id);
@@ -108,6 +108,50 @@ namespace JobQueueApi.Controllers
             }
 
         }
+
+
+        [HttpPut("{id}")]
+        public async Task<ActionResult<JobResult>> UpdateJob(Guid id, [FromBody] int[] input)
+        {
+
+            try
+            {
+                var job = await _proccessor.GetById(id);
+                if (job == null)
+                {
+                    _logger.LogInformation($"found no jobs in DB that match the given id: {id}.");
+                    return NotFound();
+                }
+                job.Input = input;
+                job.Output = new int[input.Length];
+                var workItem = new WorkItem
+                {
+                    Id = job.Id,
+                    Action = async () =>
+                    {
+                        try
+                        {
+                            await _proccessor.ProcessJob(job);
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.LogError($"an error occured while processing job {job.Id}. Message: {e.Message}. stack: {e.StackTrace}");
+                        }
+
+                    }
+                };
+                _queue.QueueBackgroundWorkItem(workItem);
+                return AcceptedAtAction(nameof(GetJob), new { id = job.Id }, new JobResult() { Job = job, CurrentPlaceInQueue = _queue.GetCurrentQueueLength() }); ;
+
+            }
+            catch (Exception e)
+            {
+                _logger.LogError($"an error occured while saving new job to DB. Message: {e.Message}. stack: {e.StackTrace}");
+                return StatusCode(500);
+            }
+
+        }
+
 
     }
 }

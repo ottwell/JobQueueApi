@@ -37,6 +37,8 @@ namespace JobQueueApiTest
 
         private readonly ITestOutputHelper _output;
 
+        private readonly int TASK_DELAY;
+
         public IConfiguration Configuration
         {
             get
@@ -68,6 +70,7 @@ namespace JobQueueApiTest
             _backgroundWorker = serviceProvider.GetService<IHostedService>() as BackgroundWorker;
             _backgroundWorker.StartAsync(CancellationToken.None).Wait();
             _controller = new JobsController(_processor, _loggerFactory, _queue);
+            TASK_DELAY = int.Parse(_config["taskDelayInSeconds"]);
         }
 
 
@@ -93,11 +96,23 @@ namespace JobQueueApiTest
             var unsorted = new int[] { 4, 6, 1, 2, -1000000 };
             var result = await _controller.PostJob(unsorted);
             Assert.IsAssignableFrom<CreatedAtActionResult>(result.Result);
-            await Task.Delay(TimeSpan.FromSeconds(int.Parse(_config["taskDelayInSeconds"])));
+            await Task.Delay(TimeSpan.FromSeconds(TASK_DELAY*2));
             var jobId = ((JobResult)((CreatedAtActionResult)result.Result).Value).Job.Id;
             var job = await _controller.GetJob(jobId);
             Assert.Equal(job.Value.Job.Status, Enum.GetName(JobStatus.Completed));
 
+        }
+
+        [Fact]
+        public async Task Can_put_job()
+        {
+            var unsorted = new int[] { 55, 77, 1, 21211, -1000000 };
+            var result = await _controller.UpdateJob(Guid.Parse("523f20c9-5def-491f-b5ff-3f3d2f4fa80b"), unsorted);
+            Assert.IsAssignableFrom<AcceptedAtActionResult>(result.Result);
+            await Task.Delay(TimeSpan.FromSeconds(TASK_DELAY*2));
+            var jobId = ((JobResult)((AcceptedAtActionResult)result.Result).Value).Job.Id;
+            var job = await _controller.GetJob(jobId);
+            Assert.Equal(job.Value.Job.Status, Enum.GetName(JobStatus.Completed));
         }
     }
 
