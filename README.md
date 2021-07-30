@@ -7,6 +7,8 @@ Queue functionality implemented using ASP.NET Core hosted services.
 - GET `/api/jobs`. Returns all jobs in the database.
 - GET `/api/jobs/{GUID}`. Returns the job with the corresponding Id value. If said job has 'Queued' status, the return object will include its' current place in the queue.
 - POST `/api/jobs`. Creates a new job entity, inserts it to the database and queues the job for processing. The request body must be an array of ints (Example: [1,2,3,4,5]). Returns a 201 response, with the created object and its' current place in queue.
+- PUT `/api/jobs/{GUID}`. Updates an existing job entity and queues it for processing. The request body must be an array of ints (Example: [1,2,3,4,5]). Returns a 202 response, with the updated object and its' current place in queue.
+
 
 ##### Job Processing
 The input array is sorted in ascending order and saved in the database. The job status is changed to: Completed.
